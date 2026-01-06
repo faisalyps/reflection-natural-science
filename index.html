@@ -1,3 +1,11 @@
+/**
+ * INSTRUKSI UNTUK GITHUB / DEPLOYMENT:
+ * 1. Pastikan Anda telah menginstal icon library:
+ * npm install lucide-react
+ * * 2. Fitur PDF menggunakan CDN (online), jadi tidak perlu npm install jspdf.
+ * Aplikasi harus terhubung internet saat menekan tombol download.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
@@ -33,26 +41,54 @@ export default function App() {
     hopeSupport: ''
   });
 
-  // Load jsPDF library dari CDN
+  // Load jsPDF library dari CDN secara aman
   useEffect(() => {
+    // Cek apakah script sudah ada agar tidak duplikat
+    if (document.getElementById('jspdf-script')) return;
+
     const script = document.createElement('script');
+    script.id = 'jspdf-script';
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
     script.async = true;
     document.body.appendChild(script);
 
-    return () => {
-      document.body.removeChild(script);
-    }
+    // Cleanup tidak diperlukan agar script tetap tersedia selama sesi
   }, []);
 
   const totalSteps = 5;
 
   const handleNext = () => {
-    if (step < totalSteps) setStep(step + 1);
+    if (step < totalSteps) {
+      setStep(step + 1);
+      window.scrollTo(0, 0); // Scroll ke atas saat ganti halaman
+    }
   };
 
   const handleBack = () => {
-    if (step > 0) setStep(step - 1);
+    if (step > 0) {
+      setStep(step - 1);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const handleReset = () => {
+    // Reset state ke awal tanpa reload browser (lebih cepat)
+    setStep(0);
+    setAnswers({
+      name: '',
+      selfEffort: 0,
+      selfStrength: '',
+      selfWeakness: '',
+      teacherRating: 0,
+      teacherFeedback: '',
+      teacherStyle: '',
+      processFavTopic: '',
+      processHardTopic: '',
+      learningStyle: '', 
+      hopeGoal: '',
+      hopeSupport: ''
+    });
+    window.scrollTo(0, 0);
   };
 
   const handleChange = (field, value) => {
@@ -67,6 +103,7 @@ export default function App() {
             key={star}
             onClick={() => handleChange(field, star)}
             className={`p-1 transition-transform hover:scale-110 ${star <= currentRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+            type="button" // Mencegah submit form tidak sengaja
           >
             <Star size={32} fill={star <= currentRating ? "currentColor" : "none"} />
           </button>
@@ -105,7 +142,7 @@ Nama: ${answers.name}
 
   const generatePDF = () => {
     if (!window.jspdf) {
-      alert("Fitur PDF sedang disiapkan. Harap tunggu beberapa detik dan coba lagi.");
+      alert("Fitur PDF sedang disiapkan atau koneksi internet terputus. Harap tunggu beberapa detik dan coba lagi.");
       return;
     }
 
@@ -122,6 +159,7 @@ Nama: ${answers.name}
         
         const lines = doc.splitTextToSize(text, maxLineWidth);
         
+        // Cek halaman penuh
         if (y + (lines.length * 7) > 280) {
             doc.addPage();
             y = 20;
@@ -132,6 +170,7 @@ Nama: ${answers.name}
         if (isTitle) y += 5; 
     };
 
+    // --- PDF CONTENT START ---
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.text("HASIL REFLEKSI SISWA - IPA", margin, y);
@@ -169,8 +208,11 @@ Nama: ${answers.name}
     doc.setFontSize(10);
     doc.setFont("helvetica", "italic");
     doc.text("Dibuat melalui Aplikasi Refleksi IPA Interaktif", margin, y);
+    // --- PDF CONTENT END ---
 
-    doc.save(`Refleksi_IPA_${answers.name.replace(/\s+/g, '_')}.pdf`);
+    // Nama file aman (ganti spasi dengan underscore)
+    const safeName = answers.name ? answers.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'siswa';
+    doc.save(`Refleksi_IPA_${safeName}.pdf`);
   };
 
   return (
@@ -186,7 +228,7 @@ Nama: ${answers.name}
           </div>
         )}
 
-        {/* Content Area - Refactored for Performance (No Inner Component Definitions) */}
+        {/* Content Area */}
         <div className="flex-1 p-8 flex flex-col justify-center">
           
           {/* STEP 0: INTRO */}
@@ -439,7 +481,7 @@ Nama: ${answers.name}
                 </button>
 
                 <button 
-                  onClick={() => window.location.reload()}
+                  onClick={handleReset}
                   className="w-full text-gray-400 px-6 py-2 rounded-lg font-medium hover:text-gray-600 text-sm flex items-center justify-center gap-2"
                 >
                   <RefreshCcw size={16} /> Isi Ulang
