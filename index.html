@@ -1,9 +1,9 @@
 /**
  * INSTRUKSI UNTUK GITHUB / DEPLOYMENT:
- * 1. Pastikan Anda telah menginstal icon library:
+ * 1. Pastikan Anda telah menginstal icon library di project Anda:
  * npm install lucide-react
- * * 2. Fitur PDF menggunakan CDN (online), jadi tidak perlu npm install jspdf.
- * Aplikasi harus terhubung internet saat menekan tombol download.
+ * * 2. Tidak perlu install jspdf lewat npm. Kode ini otomatis memanggilnya 
+ * dari CDN internet agar ukuran aplikasi Anda tetap kecil dan ringan.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,11 +21,13 @@ import {
   Frown,
   RefreshCcw,
   Copy,
-  Download
+  Download,
+  Loader2 // Icon loading
 } from 'lucide-react';
 
 export default function App() {
   const [step, setStep] = useState(0);
+  const [isPdfReady, setIsPdfReady] = useState(false); // Status kesiapan fitur PDF
   const [answers, setAnswers] = useState({
     name: '',
     selfEffort: 0,
@@ -41,54 +43,64 @@ export default function App() {
     hopeSupport: ''
   });
 
-  // Load jsPDF library dari CDN secara aman
+  // Load jsPDF library dari CDN secara aman & deteksi kapan siap
   useEffect(() => {
-    // Cek apakah script sudah ada agar tidak duplikat
-    if (document.getElementById('jspdf-script')) return;
+    // Cek jika script sudah ada di memori
+    if (window.jspdf) {
+      setIsPdfReady(true);
+      return;
+    }
 
     const script = document.createElement('script');
     script.id = 'jspdf-script';
     script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
     script.async = true;
-    document.body.appendChild(script);
+    
+    // Ketika script selesai didownload browser, aktifkan fitur PDF
+    script.onload = () => {
+      setIsPdfReady(true);
+    };
 
-    // Cleanup tidak diperlukan agar script tetap tersedia selama sesi
+    document.body.appendChild(script);
   }, []);
 
   const totalSteps = 5;
 
+  // Fungsi navigasi dengan auto-scroll ke atas
   const handleNext = () => {
     if (step < totalSteps) {
       setStep(step + 1);
-      window.scrollTo(0, 0); // Scroll ke atas saat ganti halaman
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handleBack = () => {
     if (step > 0) {
       setStep(step - 1);
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handleReset = () => {
-    // Reset state ke awal tanpa reload browser (lebih cepat)
-    setStep(0);
-    setAnswers({
-      name: '',
-      selfEffort: 0,
-      selfStrength: '',
-      selfWeakness: '',
-      teacherRating: 0,
-      teacherFeedback: '',
-      teacherStyle: '',
-      processFavTopic: '',
-      processHardTopic: '',
-      learningStyle: '', 
-      hopeGoal: '',
-      hopeSupport: ''
-    });
-    window.scrollTo(0, 0);
+    const confirmReset = window.confirm("Apakah kamu yakin ingin mengisi ulang dari awal?");
+    if (confirmReset) {
+      setStep(0);
+      setAnswers({
+        name: '',
+        selfEffort: 0,
+        selfStrength: '',
+        selfWeakness: '',
+        teacherRating: 0,
+        teacherFeedback: '',
+        teacherStyle: '',
+        processFavTopic: '',
+        processHardTopic: '',
+        learningStyle: '', 
+        hopeGoal: '',
+        hopeSupport: ''
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleChange = (field, value) => {
@@ -103,7 +115,7 @@ export default function App() {
             key={star}
             onClick={() => handleChange(field, star)}
             className={`p-1 transition-transform hover:scale-110 ${star <= currentRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-            type="button" // Mencegah submit form tidak sengaja
+            type="button"
           >
             <Star size={32} fill={star <= currentRating ? "currentColor" : "none"} />
           </button>
@@ -136,83 +148,97 @@ Nama: ${answers.name}
 - Target: ${answers.hopeGoal}
 - Butuh Bantuan: ${answers.hopeSupport}
     `;
-    navigator.clipboard.writeText(text);
-    alert("Ringkasan berhasil disalin! Silakan tempel (paste) di WA atau Google Classroom.");
+    
+    // Fallback copy mechanism untuk kompatibilitas browser lama
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Ringkasan berhasil disalin! Silakan tempel (paste) di WA atau Google Classroom.");
+        }).catch(() => {
+            alert("Gagal menyalin otomatis. Silakan screenshot halaman ini.");
+        });
+    } else {
+        alert("Browser tidak mendukung copy otomatis. Silakan screenshot halaman ini atau download PDF.");
+    }
   };
 
   const generatePDF = () => {
-    if (!window.jspdf) {
-      alert("Fitur PDF sedang disiapkan atau koneksi internet terputus. Harap tunggu beberapa detik dan coba lagi.");
+    if (!isPdfReady || !window.jspdf) {
+      alert("Fitur PDF sedang memuat. Tunggu sebentar...");
       return;
     }
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    const margin = 20;
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const maxLineWidth = pageWidth - margin * 2;
-    let y = 20;
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const margin = 20;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const maxLineWidth = pageWidth - margin * 2;
+        let y = 20;
 
-    const addText = (text, isTitle = false, isBold = false) => {
-        doc.setFont("helvetica", isBold ? "bold" : "normal");
-        doc.setFontSize(isTitle ? 14 : 11);
+        const addText = (text, isTitle = false, isBold = false) => {
+            doc.setFont("helvetica", isBold ? "bold" : "normal");
+            doc.setFontSize(isTitle ? 14 : 11);
+            
+            // Text wrapping agar tidak terpotong
+            const lines = doc.splitTextToSize(text, maxLineWidth);
+            
+            // Auto page break jika halaman penuh
+            if (y + (lines.length * 7) > 280) {
+                doc.addPage();
+                y = 20;
+            }
+
+            doc.text(lines, margin, y);
+            y += (lines.length * 7);
+            if (isTitle) y += 5; 
+        };
+
+        // --- ISI PDF ---
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.text("HASIL REFLEKSI SISWA - IPA", margin, y);
+        y += 15;
+
+        doc.setFontSize(12);
+        doc.text(`Nama: ${answers.name}`, margin, y);
+        y += 10;
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 10;
+
+        addText("1. REFLEKSI DIRI", true, true);
+        addText(`- Usaha: ${answers.selfEffort}/5`);
+        addText(`- Kekuatan: ${answers.selfStrength || '-'}`);
+        addText(`- Kelemahan: ${answers.selfWeakness || '-'}`);
+        y += 5;
+
+        addText("2. REFLEKSI GURU", true, true);
+        addText(`- Rating Pengajaran: ${answers.teacherRating}/5`);
+        addText(`- Gaya Mengajar Favorit: ${answers.teacherStyle || '-'}`);
+        addText(`- Masukan: ${answers.teacherFeedback || '-'}`);
+        y += 5;
+
+        addText("3. PROSES BELAJAR", true, true);
+        addText(`- Materi Favorit: ${answers.processFavTopic || '-'}`);
+        addText(`- Materi Sulit: ${answers.processHardTopic || '-'}`);
+        addText(`- Gaya Belajar: ${answers.learningStyle || '-'}`);
+        y += 5;
+
+        addText("4. HARAPAN", true, true);
+        addText(`- Target: ${answers.hopeGoal || '-'}`);
+        addText(`- Butuh Bantuan: ${answers.hopeSupport || '-'}`);
+
+        y += 10;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "italic");
+        doc.text("Dibuat melalui Aplikasi Refleksi IPA Interaktif", margin, y);
         
-        const lines = doc.splitTextToSize(text, maxLineWidth);
-        
-        // Cek halaman penuh
-        if (y + (lines.length * 7) > 280) {
-            doc.addPage();
-            y = 20;
-        }
-
-        doc.text(lines, margin, y);
-        y += (lines.length * 7);
-        if (isTitle) y += 5; 
-    };
-
-    // --- PDF CONTENT START ---
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("HASIL REFLEKSI SISWA - IPA", margin, y);
-    y += 15;
-
-    doc.setFontSize(12);
-    doc.text(`Nama: ${answers.name}`, margin, y);
-    y += 10;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 10;
-
-    addText("1. REFLEKSI DIRI", true, true);
-    addText(`- Usaha: ${answers.selfEffort}/5`);
-    addText(`- Kekuatan: ${answers.selfStrength || '-'}`);
-    addText(`- Kelemahan: ${answers.selfWeakness || '-'}`);
-    y += 5;
-
-    addText("2. REFLEKSI GURU", true, true);
-    addText(`- Rating Pengajaran: ${answers.teacherRating}/5`);
-    addText(`- Gaya Mengajar Favorit: ${answers.teacherStyle || '-'}`);
-    addText(`- Masukan: ${answers.teacherFeedback || '-'}`);
-    y += 5;
-
-    addText("3. PROSES BELAJAR", true, true);
-    addText(`- Materi Favorit: ${answers.processFavTopic || '-'}`);
-    addText(`- Materi Sulit: ${answers.processHardTopic || '-'}`);
-    addText(`- Gaya Belajar: ${answers.learningStyle || '-'}`);
-    y += 5;
-
-    addText("4. HARAPAN", true, true);
-    addText(`- Target: ${answers.hopeGoal || '-'}`);
-    addText(`- Butuh Bantuan: ${answers.hopeSupport || '-'}`);
-
-    y += 10;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "italic");
-    doc.text("Dibuat melalui Aplikasi Refleksi IPA Interaktif", margin, y);
-    // --- PDF CONTENT END ---
-
-    // Nama file aman (ganti spasi dengan underscore)
-    const safeName = answers.name ? answers.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'siswa';
-    doc.save(`Refleksi_IPA_${safeName}.pdf`);
+        // Simpan file
+        const safeName = answers.name ? answers.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'siswa';
+        doc.save(`Refleksi_IPA_${safeName}.pdf`);
+    } catch (error) {
+        console.error(error);
+        alert("Terjadi kesalahan saat membuat PDF. Silakan coba lagi.");
+    }
   };
 
   return (
@@ -468,9 +494,11 @@ Nama: ${answers.name}
               <div className="flex flex-col gap-3">
                 <button 
                   onClick={generatePDF}
-                  className="w-full bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                  disabled={!isPdfReady}
+                  className={`w-full text-white px-6 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md ${!isPdfReady ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
                 >
-                  <Download size={20} /> Download PDF (Simpan File)
+                  {!isPdfReady ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                  {!isPdfReady ? "Menyiapkan PDF..." : "Download PDF (Simpan File)"}
                 </button>
 
                 <button 
