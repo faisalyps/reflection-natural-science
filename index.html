@@ -1,0 +1,475 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BookOpen, 
+  User, 
+  GraduationCap, 
+  Star, 
+  ArrowRight, 
+  ArrowLeft, 
+  Send, 
+  CheckCircle,
+  Lightbulb,
+  Smile,
+  Frown,
+  RefreshCcw,
+  Copy,
+  Download
+} from 'lucide-react';
+
+export default function App() {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({
+    name: '',
+    selfEffort: 0,
+    selfStrength: '',
+    selfWeakness: '',
+    teacherRating: 0,
+    teacherFeedback: '',
+    teacherStyle: '',
+    processFavTopic: '',
+    processHardTopic: '',
+    learningStyle: '', 
+    hopeGoal: '',
+    hopeSupport: ''
+  });
+
+  // Load jsPDF library dari CDN
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    }
+  }, []);
+
+  const totalSteps = 5;
+
+  const handleNext = () => {
+    if (step < totalSteps) setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    if (step > 0) setStep(step - 1);
+  };
+
+  const handleChange = (field, value) => {
+    setAnswers(prev => ({ ...prev, [field]: value }));
+  };
+
+  const renderStars = (field, currentRating) => {
+    return (
+      <div className="flex gap-2 justify-center my-4">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            onClick={() => handleChange(field, star)}
+            className={`p-1 transition-transform hover:scale-110 ${star <= currentRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+          >
+            <Star size={32} fill={star <= currentRating ? "currentColor" : "none"} />
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const copyToClipboard = () => {
+    const text = `
+REKAP REFLEKSI SISWA - IPA
+Nama: ${answers.name}
+
+1. REFLEKSI DIRI
+- Usaha: ${answers.selfEffort}/5
+- Kekuatan: ${answers.selfStrength}
+- Kelemahan: ${answers.selfWeakness}
+
+2. REFLEKSI GURU
+- Rating Pengajaran: ${answers.teacherRating}/5
+- Gaya Mengajar: ${answers.teacherStyle}
+- Masukan: ${answers.teacherFeedback}
+
+3. PROSES BELAJAR
+- Materi Favorit: ${answers.processFavTopic}
+- Materi Sulit: ${answers.processHardTopic}
+- Gaya Belajar: ${answers.learningStyle}
+
+4. HARAPAN
+- Target: ${answers.hopeGoal}
+- Butuh Bantuan: ${answers.hopeSupport}
+    `;
+    navigator.clipboard.writeText(text);
+    alert("Ringkasan berhasil disalin! Silakan tempel (paste) di WA atau Google Classroom.");
+  };
+
+  const generatePDF = () => {
+    if (!window.jspdf) {
+      alert("Fitur PDF sedang disiapkan. Harap tunggu beberapa detik dan coba lagi.");
+      return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const margin = 20;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const maxLineWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    const addText = (text, isTitle = false, isBold = false) => {
+        doc.setFont("helvetica", isBold ? "bold" : "normal");
+        doc.setFontSize(isTitle ? 14 : 11);
+        
+        const lines = doc.splitTextToSize(text, maxLineWidth);
+        
+        if (y + (lines.length * 7) > 280) {
+            doc.addPage();
+            y = 20;
+        }
+
+        doc.text(lines, margin, y);
+        y += (lines.length * 7);
+        if (isTitle) y += 5; 
+    };
+
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("HASIL REFLEKSI SISWA - IPA", margin, y);
+    y += 15;
+
+    doc.setFontSize(12);
+    doc.text(`Nama: ${answers.name}`, margin, y);
+    y += 10;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+
+    addText("1. REFLEKSI DIRI", true, true);
+    addText(`- Usaha: ${answers.selfEffort}/5`);
+    addText(`- Kekuatan: ${answers.selfStrength || '-'}`);
+    addText(`- Kelemahan: ${answers.selfWeakness || '-'}`);
+    y += 5;
+
+    addText("2. REFLEKSI GURU", true, true);
+    addText(`- Rating Pengajaran: ${answers.teacherRating}/5`);
+    addText(`- Gaya Mengajar Favorit: ${answers.teacherStyle || '-'}`);
+    addText(`- Masukan: ${answers.teacherFeedback || '-'}`);
+    y += 5;
+
+    addText("3. PROSES BELAJAR", true, true);
+    addText(`- Materi Favorit: ${answers.processFavTopic || '-'}`);
+    addText(`- Materi Sulit: ${answers.processHardTopic || '-'}`);
+    addText(`- Gaya Belajar: ${answers.learningStyle || '-'}`);
+    y += 5;
+
+    addText("4. HARAPAN", true, true);
+    addText(`- Target: ${answers.hopeGoal || '-'}`);
+    addText(`- Butuh Bantuan: ${answers.hopeSupport || '-'}`);
+
+    y += 10;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.text("Dibuat melalui Aplikasi Refleksi IPA Interaktif", margin, y);
+
+    doc.save(`Refleksi_IPA_${answers.name.replace(/\s+/g, '_')}.pdf`);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col min-h-[600px]">
+        {/* Header Progress Bar */}
+        {step > 0 && step < totalSteps && (
+          <div className="bg-gray-100 h-2 w-full">
+            <div 
+              className="bg-blue-500 h-full transition-all duration-500 ease-out"
+              style={{ width: `${(step / totalSteps) * 100}%` }}
+            ></div>
+          </div>
+        )}
+
+        {/* Content Area - Refactored for Performance (No Inner Component Definitions) */}
+        <div className="flex-1 p-8 flex flex-col justify-center">
+          
+          {/* STEP 0: INTRO */}
+          {step === 0 && (
+            <div className="text-center space-y-6 animate-fade-in">
+              <div className="bg-blue-100 p-4 rounded-full w-24 h-24 mx-auto flex items-center justify-center">
+                <Lightbulb size={48} className="text-blue-600" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-800">Refleksi Awal Semester</h1>
+              <p className="text-gray-600 text-lg">
+                Halo! Sebelum kita mulai belajar IPA semester ini, mari kita lihat ke belakang sebentar. 
+                Jawablah dengan jujur dan santai. Tidak ada jawaban benar atau salah!
+              </p>
+              <div className="pt-4">
+                <label className="block text-left font-medium text-gray-700 mb-2">Nama Lengkap / Panggilan:</label>
+                <input 
+                  type="text" 
+                  value={answers.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 outline-none"
+                  placeholder="Tulis namamu di sini..."
+                  autoFocus
+                />
+              </div>
+              <button 
+                onClick={handleNext}
+                disabled={!answers.name}
+                className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-full font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center gap-2 mx-auto"
+              >
+                Mulai Refleksi <ArrowRight size={20} />
+              </button>
+            </div>
+          )}
+
+          {/* STEP 1: SELF REFLECTION */}
+          {step === 1 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-green-100 p-3 rounded-full">
+                  <User size={24} className="text-green-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Refleksi Diri Sendiri</h2>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+                <label className="block font-medium text-gray-700 mb-2 text-center">Seberapa keras usahamu di semester lalu?</label>
+                {renderStars('selfEffort', answers.selfEffort)}
+                <p className="text-center text-sm text-gray-500">{answers.selfEffort === 0 ? "Pilih bintang" : answers.selfEffort < 3 ? "Masih bisa lebih baik lagi" : "Sudah cukup maksimal"}</p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium text-gray-700 mb-2">Apa kelebihanmu saat belajar IPA?</label>
+                  <textarea 
+                    value={answers.selfStrength}
+                    onChange={(e) => handleChange('selfStrength', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 outline-none h-32"
+                    placeholder="Contoh: Saya rajin mencatat, saya suka praktikum..."
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-gray-700 mb-2">Apa kebiasaan buruk yang ingin kamu ubah?</label>
+                  <textarea 
+                    value={answers.selfWeakness}
+                    onChange={(e) => handleChange('selfWeakness', e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-400 outline-none h-32"
+                    placeholder="Contoh: Suka menunda tugas, malu bertanya..."
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: TEACHER REFLECTION */}
+          {step === 2 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-purple-100 p-3 rounded-full">
+                  <GraduationCap size={24} className="text-purple-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Refleksi Guru IPA</h2>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm text-center">
+                <label className="block font-medium text-gray-700 mb-2">Apakah penjelasan Guru mudah dipahami?</label>
+                {renderStars('teacherRating', answers.teacherRating)}
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-2">Cara belajar seperti apa yang kamu suka dari Guru?</label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                  {['Banyak Cerita/Video', 'Banyak Latihan Soal', 'Banyak Praktikum/Eksperimen'].map((option) => (
+                     <button
+                     key={option}
+                     onClick={() => handleChange('teacherStyle', option)}
+                     className={`p-3 rounded-lg border text-sm font-medium transition-all ${answers.teacherStyle === option ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 hover:bg-purple-50'}`}
+                   >
+                     {option}
+                   </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-2">Pesan/Saran jujur untuk Guru agar mengajar lebih asik:</label>
+                <textarea 
+                  value={answers.teacherFeedback}
+                  onChange={(e) => handleChange('teacherFeedback', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 outline-none h-32"
+                  placeholder="Jangan ragu, tulis saja. Pak/Bu Guru tidak akan marah..."
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: PROCESS REFLECTION */}
+          {step === 3 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-orange-100 p-3 rounded-full">
+                  <BookOpen size={24} className="text-orange-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Refleksi Proses Belajar</h2>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+                  <div className="flex items-center gap-2 mb-2 text-orange-800 font-semibold">
+                    <Smile size={20} /> Materi Paling Seru
+                  </div>
+                  <input 
+                    type="text"
+                    value={answers.processFavTopic}
+                    onChange={(e) => handleChange('processFavTopic', e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-300 outline-none"
+                    placeholder="Misal: Sistem Tata Surya, Listrik..."
+                  />
+                </div>
+                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                   <div className="flex items-center gap-2 mb-2 text-red-800 font-semibold">
+                    <Frown size={20} /> Materi Paling Sulit
+                  </div>
+                  <input 
+                     type="text"
+                     value={answers.processHardTopic}
+                     onChange={(e) => handleChange('processHardTopic', e.target.value)}
+                     className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-300 outline-none"
+                     placeholder="Misal: Hukum Newton, Kimia..."
+                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-3">Menurutmu, kamu tipe pembelajar yang mana?</label>
+                <div className="space-y-2">
+                  {[
+                    { id: 'Visual', text: 'Saya suka melihat gambar, diagram, atau video.' },
+                    { id: 'Auditory', text: 'Saya suka mendengarkan penjelasan guru atau diskusi.' },
+                    { id: 'Kinestetik', text: 'Saya suka bergerak, praktek langsung, atau memegang alat.' }
+                  ].map((type) => (
+                     <button
+                     key={type.id}
+                     onClick={() => handleChange('learningStyle', type.id)}
+                     className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between ${answers.learningStyle === type.id ? 'bg-orange-100 border-orange-400 ring-1 ring-orange-400' : 'bg-white hover:bg-gray-50'}`}
+                   >
+                     <span>{type.text}</span>
+                     {answers.learningStyle === type.id && <CheckCircle size={20} className="text-orange-600" />}
+                   </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: HOPES */}
+          {step === 4 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-teal-100 p-3 rounded-full">
+                  <Send size={24} className="text-teal-600" />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Harapan Semester Ini</h2>
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-2">Apa target utamamu semester ini?</label>
+                <textarea 
+                  value={answers.hopeGoal}
+                  onChange={(e) => handleChange('hopeGoal', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 outline-none h-24"
+                  placeholder="Nilai ujian 90? Lebih rajin mengerjakan PR? Bisa presentasi dengan lancar?"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-gray-700 mb-2">Apa yang kamu butuhkan dari Guru untuk mencapai target itu?</label>
+                <textarea 
+                  value={answers.hopeSupport}
+                  onChange={(e) => handleChange('hopeSupport', e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-400 outline-none h-24"
+                  placeholder="Misal: Tolong jelaskan lebih pelan, atau berikan ringkasan materi..."
+                />
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: SUMMARY */}
+          {step === 5 && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="text-center mb-8">
+                <div className="bg-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle size={32} />
+                </div>
+                <h2 className="text-2xl font-bold text-gray-800">Terima Kasih, {answers.name}!</h2>
+                <p className="text-gray-600">Refleksimu sangat berharga. Mari jadikan semester ini luar biasa.</p>
+              </div>
+
+              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 text-sm space-y-4 max-h-96 overflow-y-auto">
+                <h3 className="font-bold text-gray-800 border-b pb-2">Ringkasan Jawabanmu:</h3>
+                
+                <div><span className="font-semibold text-blue-600">Usaha Semester Lalu:</span> {answers.selfEffort}/5</div>
+                <div><span className="font-semibold text-blue-600">Kekuatan:</span> {answers.selfStrength || '-'}</div>
+                <div><span className="font-semibold text-blue-600">Kelemahan:</span> {answers.selfWeakness || '-'}</div>
+                
+                <div className="border-t pt-2 mt-2"></div>
+                <div><span className="font-semibold text-purple-600">Rating Guru:</span> {answers.teacherRating}/5</div>
+                <div><span className="font-semibold text-purple-600">Masukan:</span> {answers.teacherFeedback || '-'}</div>
+                
+                <div className="border-t pt-2 mt-2"></div>
+                <div><span className="font-semibold text-orange-600">Materi Favorit:</span> {answers.processFavTopic || '-'}</div>
+                <div><span className="font-semibold text-orange-600">Gaya Belajar:</span> {answers.learningStyle || '-'}</div>
+                
+                <div className="border-t pt-2 mt-2"></div>
+                <div><span className="font-semibold text-teal-600">Target:</span> {answers.hopeGoal || '-'}</div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={generatePDF}
+                  className="w-full bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-md"
+                >
+                  <Download size={20} /> Download PDF (Simpan File)
+                </button>
+
+                <button 
+                  onClick={copyToClipboard}
+                  className="w-full bg-white text-blue-600 px-6 py-3 rounded-lg font-bold hover:bg-blue-50 border border-blue-200 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Copy size={20} /> Salin Teks (Untuk WA)
+                </button>
+
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="w-full text-gray-400 px-6 py-2 rounded-lg font-medium hover:text-gray-600 text-sm flex items-center justify-center gap-2"
+                >
+                  <RefreshCcw size={16} /> Isi Ulang
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Footer */}
+        {step > 0 && step < totalSteps && (
+          <div className="bg-gray-50 p-6 border-t border-gray-100 flex justify-between items-center">
+            <button 
+              onClick={handleBack}
+              className="text-gray-500 font-semibold hover:text-gray-700 flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <ArrowLeft size={18} /> Kembali
+            </button>
+            <div className="text-gray-400 text-sm font-medium">
+              Langkah {step} dari 4
+            </div>
+            <button 
+              onClick={handleNext}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 shadow-md transition-colors flex items-center gap-2"
+            >
+              {step === 4 ? "Selesai & Lihat Hasil" : "Lanjut"} <ArrowRight size={18} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
